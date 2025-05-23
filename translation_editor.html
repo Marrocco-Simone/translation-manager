@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-section {
+            background: #f8f9ff;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px dashed #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .file-input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .file-input-container {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .file-input-container label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .file-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .language-manager {
+            background: #fff;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .language-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .language-tab {
+            padding: 10px 20px;
+            background: #f0f2ff;
+            border: 2px solid #e0e2ff;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .language-tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-color: transparent;
+        }
+
+        .language-tab:hover:not(.active) {
+            background: #e0e2ff;
+            transform: translateY(-2px);
+        }
+
+        .remove-language {
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 8px;
+            display: none;
+        }
+
+        .language-tab:hover .remove-language {
+            display: inline-block;
+        }
+
+        .add-language-section {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .add-language-input {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 120px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #2ed573, #1e90ff);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 213, 115, 0.4);
+        }
+
+        .editor-section {
+            background: #fff;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .translation-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .translation-row {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .translation-row:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .translation-key {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .translation-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .translation-input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .translation-input-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+        }
+
+        .translation-input {
+            padding: 12px;
+            border: 2px solid #e0e2ff;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .translation-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: scale(1.02);
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 600;
+            display: none;
+        }
+
+        .status.success {
+            background: linear-gradient(45deg, #2ed573, #7bed9f);
+            color: white;
+        }
+
+        .status.error {
+            background: linear-gradient(45deg, #ff4757, #ff6b7a);
+            color: white;
+        }
+
+        .nested-section {
+            margin-left: 20px;
+            border-left: 3px solid #764ba2;
+            padding-left: 20px;
+            margin-top: 15px;
+        }
+
+        .nested-key {
+            font-weight: 600;
+            color: #764ba2;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .translation-row {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .file-input-group {
+                flex-direction: column;
+            }
+            
+            .add-language-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .translation-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 Translation Editor</h1>
+        
+        <div class="upload-section">
+            <div class="file-input-group">
+                <div class="file-input-container">
+                    <label for="itFile">Italian (IT)</label>
+                    <input type="file" id="itFile" class="file-input" accept=".json">
+                </div>
+                <div class="file-input-container">
+                    <label for="enFile">English (EN)</label>
+                    <input type="file" id="enFile" class="file-input" accept=".json">
+                </div>
+                <div class="file-input-container">
+                    <label for="jpFile">Japanese (JP)</label>
+                    <input type="file" id="jpFile" class="file-input" accept=".json">
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn btn-primary" onclick="loadFiles()">Load Translation Files</button>
+            </div>
+        </div>
+
+        <div class="language-manager">
+            <h3 style="margin-bottom: 20px; color: #333;">Languages</h3>
+            <div class="language-tabs" id="languageTabs"></div>
+            <div class="add-language-section">
+                <input type="text" id="newLanguageCode" class="add-language-input" placeholder="Language code (e.g., fr, de)" maxlength="5">
+                <button class="btn btn-primary" onclick="addLanguage()">Add Language</button>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="editor-section">
+            <h3 style="margin-bottom: 20px; color: #333;">Translation Editor</h3>
+            <div class="translation-grid" id="translationGrid"></div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-success" onclick="downloadTranslations()">Download All Translations</button>
+            <button class="btn btn-primary" onclick="downloadSingle()">Download Current Language</button>
+        </div>
+    </div>
+
+    <script>
+        let translations = {};
+        let languages = ['it', 'en', 'jp'];
+        let currentLanguage = 'it';
+        let translationStructure = {};
+
+        function showStatus(message, type = 'success') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+
+        function updateLanguageTabs() {
+            const container = document.getElementById('languageTabs');
+            container.innerHTML = '';
+            
+            languages.forEach(lang => {
+                const tab = document.createElement('div');
+                tab.className = `language-tab ${lang === currentLanguage ? 'active' : ''}`;
+                tab.innerHTML = `
+                    ${lang.toUpperCase()}
+                    ${languages.length > 1 ? `<button class="remove-language" onclick="removeLanguage('${lang}')" title="Remove language">×</button>` : ''}
+                `;
+                tab.onclick = (e) => {
+                    if (e.target.classList.contains('remove-language')) return;
+                    currentLanguage = lang;
+                    updateLanguageTabs();
+                };
+                container.appendChild(tab);
+            });
+        }
+
+        function addLanguage() {
+            const input = document.getElementById('newLanguageCode');
+            const newLang = input.value.trim().toLowerCase();
+            
+            if (!newLang) {
+                showStatus('Please enter a language code', 'error');
+                return;
+            }
+            
+            if (languages.includes(newLang)) {
+                showStatus('Language already exists', 'error');
+                return;
+            }
+            
+            languages.push(newLang);
+            translations[newLang] = {};
+            
+            // Initialize new language with empty values based on structure
+            function initializeStructure(obj, target) {
+                for (const key in obj) {
+                    if (typeof obj[key] === 'object' && obj[key] !== null) {
+                        target[key] = {};
+                        initializeStructure(obj[key], target[key]);
+                    } else {
+                        target[key] = '';
+                    }
+                }
+            }
+            
+            if (Object.keys(translationStructure).length > 0) {
+                initializeStructure(translationStructure, translations[newLang]);
+            }
+            
+            input.value = '';
+            updateLanguageTabs();
+            renderTranslations();
+            showStatus(`Language ${newLang.toUpperCase()} added successfully`);
+        }
+
+        function removeLanguage(lang) {
+            if (languages.length <= 1) {
+                showStatus('Cannot remove the last language', 'error');
+                return;
+            }
+            
+            languages = languages.filter(l => l !== lang);
+            delete translations[lang];
+            
+            if (currentLanguage === lang) {
+                currentLanguage = languages[0];
+            }
+            
+            updateLanguageTabs();
+            renderTranslations();
+            showStatus(`Language ${lang.toUpperCase()} removed`);
+        }
+
+        async function loadFiles() {
+            const fileInputs = {
+                it: document.getElementById('itFile'),
+                en: document.getElementById('enFile'),
+                jp: document.getElementById('jpFile')
+            };
+
+            let loadedCount = 0;
+            translations = {};
+
+            for (const [lang, input] of Object.entries(fileInputs)) {
+                if (input.files.length > 0) {
+                    try {
+                        const file = input.files[0];
+                        const content = await file.text();
+                        const data = JSON.parse(content);
+                        translations[lang] = data;
+                        loadedCount++;
+                    } catch (error) {
+                        showStatus(`Error loading ${lang.toUpperCase()} file: ${error.message}`, 'error');
+                        return;
+                    }
+                }
+            }
+
+            if (loadedCount === 0) {
+                showStatus('Please select at least one file to load', 'error');
+                return;
+            }
+
+            // Build translation structure from the first loaded file
+            const firstLang = Object.keys(translations)[0];
+            translationStructure = JSON.parse(JSON.stringify(translations[firstLang]));
+
+            // Update languages list based on loaded files
+            languages = Object.keys(translations);
+            currentLanguage = languages[0];
+
+            updateLanguageTabs();
+            renderTranslations();
+            showStatus(`Successfully loaded ${loadedCount} translation file(s)`);
+        }
+
+        function renderTranslations() {
+            const container = document.getElementById('translationGrid');
+            container.innerHTML = '';
+
+            if (Object.keys(translations).length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">Load translation files to start editing</p>';
+                return;
+            }
+
+            function renderLevel(obj, parentKey = '', level = 0) {
+                for (const key in obj) {
+                    const fullKey = parentKey ? `${parentKey}.${key}` : key;
+                    
+                    if (typeof obj[key] === 'object' && obj[key] !== null) {
+                        // Nested object
+                        const nestedContainer = document.createElement('div');
+                        nestedContainer.className = level > 0 ? 'nested-section' : 'translation-row';
+                        
+                        const keyHeader = document.createElement('div');
+                        keyHeader.className = level > 0 ? 'nested-key' : 'translation-key';
+                        keyHeader.textContent = key;
+                        nestedContainer.appendChild(keyHeader);
+                        
+                        container.appendChild(nestedContainer);
+                        
+                        // Render nested items
+                        const tempObj = { [key]: obj[key] };
+                        const tempContainer = container;
+                        container.innerHTML += `<div class="nested-section" id="nested-${fullKey.replace(/\./g, '-')}"></div>`;
+                        
+                        setTimeout(() => {
+                            const nestedDiv = document.getElementById(`nested-${fullKey.replace(/\./g, '-')}`);
+                            if (nestedDiv) {
+                                renderNestedItems(obj[key], fullKey, nestedDiv);
+                            }
+                        }, 0);
+                    } else {
+                        // Regular translation item
+                        const row = document.createElement('div');
+                        row.className = 'translation-row';
+
+                        const keyDiv = document.createElement('div');
+                        keyDiv.className = 'translation-key';
+                        keyDiv.textContent = fullKey;
+
+                        const inputsDiv = document.createElement('div');
+                        inputsDiv.className = 'translation-inputs';
+
+                        languages.forEach(lang => {
+                            const group = document.createElement('div');
+                            group.className = 'translation-input-group';
+
+                            const label = document.createElement('label');
+                            label.textContent = lang.toUpperCase();
+
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.className = 'translation-input';
+                            input.value = getNestedValue(translations[lang] || {}, fullKey) || '';
+                            input.onchange = () => updateTranslation(lang, fullKey, input.value);
+
+                            group.appendChild(label);
+                            group.appendChild(input);
+                            inputsDiv.appendChild(group);
+                        });
+
+                        row.appendChild(keyDiv);
+                        row.appendChild(inputsDiv);
+                        container.appendChild(row);
+                    }
+                }
+            }
+
+            function renderNestedItems(obj, parentKey, container) {
+                for (const key in obj) {
+                    const fullKey = `${parentKey}.${key}`;
+                    
+                    if (typeof obj[key] === 'object' && obj[key] !== null) {
+                        const keyHeader = document.createElement('div');
+                        keyHeader.className = 'nested-key';
+                        keyHeader.textContent = key;
+                        container.appendChild(keyHeader);
+                        
+                        renderNestedItems(obj[key], fullKey, container);
+                    } else {
+                        const row = document.createElement('div');
+                        row.className = 'translation-row';
+                        row.style.marginLeft = '0';
+                        row.style.borderLeft = '3px solid #7bed9f';
+
+                        const keyDiv = document.createElement('div');
+                        keyDiv.className = 'nested-key';
+                        keyDiv.textContent = key;
+
+                        const inputsDiv = document.createElement('div');
+                        inputsDiv.className = 'translation-inputs';
+
+                        languages.forEach(lang => {
+                            const group = document.createElement('div');
+                            group.className = 'translation-input-group';
+
+                            const label = document.createElement('label');
+                            label.textContent = lang.toUpperCase();
+
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.className = 'translation-input';
+                            input.value = getNestedValue(translations[lang] || {}, fullKey) || '';
+                            input.onchange = () => updateTranslation(lang, fullKey, input.value);
+
+                            group.appendChild(label);
+                            group.appendChild(input);
+                            inputsDiv.appendChild(group);
+                        });
+
+                        row.appendChild(keyDiv);
+                        row.appendChild(inputsDiv);
+                        container.appendChild(row);
+                    }
+                }
+            }
+
+            // Get the structure from the first available translation
+            const firstLang = Object.keys(translations)[0];
+            if (firstLang && translations[firstLang]) {
+                renderLevel(translations[firstLang]);
+            }
+        }
+
+        function getNestedValue(obj, path) {
+            return path.split('.').reduce((current, key) => current && current[key], obj);
+        }
+
+        function setNestedValue(obj, path, value) {
+            const keys = path.split('.');
+            const lastKey = keys.pop();
+            const target = keys.reduce((current, key) => {
+                if (!current[key]) current[key] = {};
+                return current[key];
+            }, obj);
+            target[lastKey] = value;
+        }
+
+        function updateTranslation(lang, key, value) {
+            if (!translations[lang]) {
+                translations[lang] = {};
+            }
+            setNestedValue(translations[lang], key, value);
+        }
+
+        function downloadTranslations() {
+            if (Object.keys(translations).length === 0) {
+                showStatus('No translations to download', 'error');
+                return;
+            }
+
+            const zip = {};
+            for (const [lang, data] of Object.entries(translations)) {
+                zip[`${lang}.json`] = JSON.stringify(data, null, 2);
+            }
+
+            // Create and download individual files
+            for (const [filename, content] of Object.entries(zip)) {
+                const blob = new Blob([content], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            showStatus('All translations downloaded successfully');
+        }
+
+        function downloadSingle() {
+            if (!translations[currentLanguage]) {
+                showStatus('No translation data for current language', 'error');
+                return;
+            }
+
+            const content = JSON.stringify(translations[currentLanguage], null, 2);
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentLanguage}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus(`${currentLanguage.toUpperCase()} translation downloaded`);
+        }
+
+        // Initialize the app
+        updateLanguageTabs();
+        renderTranslations();
+    </script>
+</body>
+</html>
