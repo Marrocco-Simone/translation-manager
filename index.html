@@ -3,8 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Translation Editor</title>
+    <title>Translation Manager</title>
     <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-light: #e0e7ff;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border-color: #334155;
+            --accent-light: #312e81;
+            --success-light: #064e3b;
+            --warning-light: #78350f;
+            --danger-light: #7f1d1d;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,708 +51,1966 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 20px;
+            transition: background 0.3s, color 0.3s;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
+        /* Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            min-height: 100vh;
         }
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 2.5rem;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        @media (max-width: 1200px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+            .sidebar, .export-panel {
+                display: none;
+            }
+            .sidebar.mobile-open, .export-panel.mobile-open {
+                display: block;
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                z-index: 100;
+                width: 320px;
+                overflow-y: auto;
+            }
+            .sidebar.mobile-open { left: 0; }
+            .export-panel.mobile-open { right: 0; }
+            .mobile-overlay {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 99;
+            }
         }
 
-        .upload-section {
-            background: #f8f9ff;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            border: 2px dashed #667eea;
-            transition: all 0.3s ease;
-        }
+        .mobile-overlay { display: none; }
 
-        .upload-section:hover {
-            border-color: #764ba2;
-            background: #f0f2ff;
-        }
-
-        .file-input-group {
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
             display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 20px;
+            flex-direction: column;
+            gap: 24px;
         }
 
-        .file-input-container {
-            flex: 1;
-            min-width: 200px;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-primary);
         }
 
-        .file-input-container label {
-            display: block;
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
             font-weight: 600;
-            margin-bottom: 8px;
-            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
         }
 
-        .file-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .file-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .language-manager {
-            background: #fff;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .language-tabs {
+        /* Language List */
+        .language-list {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            overflow-y: auto;
         }
 
-        .language-tab {
-            padding: 10px 20px;
-            background: #f0f2ff;
-            border: 2px solid #e0e2ff;
-            border-radius: 25px;
+        .language-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .language-item:hover {
+            background: var(--accent-light);
+        }
+
+        .language-item.active {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .language-item.empty {
+            opacity: 0.6;
+        }
+
+        .language-flag {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.875rem;
+            color: var(--accent-primary);
+        }
+
+        .language-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .language-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .language-stats {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .language-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .language-item:hover .language-actions {
+            opacity: 1;
+        }
+
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .icon-btn.upload:hover {
+            background: var(--accent-primary);
+        }
+
+        /* Add Language */
+        .add-language-form {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-language-form input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .add-language-form input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .add-language-form button {
+            padding: 10px 16px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-language-form button:hover {
+            background: var(--accent-secondary);
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+        }
+
+        .theme-toggle span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 26px;
+            background: var(--border-color);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(22px);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .main-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 1200px) {
+            .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
             position: relative;
         }
 
-        .language-tab.active {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border-color: transparent;
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
         }
 
-        .language-tab:hover:not(.active) {
-            background: #e0e2ff;
-            transform: translateY(-2px);
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
         }
 
-        .remove-language {
-            background: #ff4757;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            margin-left: 8px;
-            display: none;
+        .search-box svg {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
         }
 
-        .language-tab:hover .remove-language {
-            display: inline-block;
-        }
-
-        .add-language-section {
+        .header-actions {
             display: flex;
-            gap: 10px;
-            align-items: end;
-        }
-
-        .add-language-input {
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            width: 120px;
+            gap: 8px;
         }
 
         .btn {
-            padding: 12px 24px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .btn-primary {
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: var(--accent-primary);
             color: white;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
         }
 
         .btn-success {
-            background: linear-gradient(45deg, #2ed573, #1e90ff);
+            background: var(--success);
             color: white;
         }
 
         .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(46, 213, 115, 0.4);
+            opacity: 0.9;
         }
 
-        .editor-section {
-            background: #fff;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .translation-grid {
-            display: grid;
-            gap: 20px;
-        }
-
-        .translation-row {
-            background: #f8f9ff;
-            border-radius: 12px;
-            padding: 20px;
-            border-left: 4px solid #667eea;
-            transition: all 0.3s ease;
-        }
-
-        .translation-row:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .translation-key {
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 8px;
-        }
-
-        .translation-inputs {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-
-        .translation-input-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .translation-input-group label {
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-            letter-spacing: 0.5px;
-        }
-
-        .translation-input {
-            padding: 12px;
-            border: 2px solid #e0e2ff;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            background: white;
-        }
-
-        .translation-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            transform: scale(1.02);
-        }
-
-        .actions {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .status {
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 48px;
             text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-weight: 600;
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+            margin-bottom: 24px;
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .drop-zone-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: var(--accent-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-primary);
+        }
+
+        .drop-zone h3 {
+            font-size: 1.125rem;
+            margin-bottom: 8px;
+        }
+
+        .drop-zone p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+
+        .drop-zone input[type="file"] {
             display: none;
         }
 
-        .status.success {
-            background: linear-gradient(45deg, #2ed573, #7bed9f);
-            color: white;
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
         }
 
-        .status.error {
-            background: linear-gradient(45deg, #ff4757, #ff6b7a);
-            color: white;
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            background: var(--bg-secondary);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
         }
 
-        .nested-section {
-            margin-left: 20px;
-            border-left: 3px solid #764ba2;
-            padding-left: 20px;
-            margin-top: 15px;
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-primary);
         }
 
-        .nested-key {
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Translation Editor */
+        .translation-editor {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .editor-title {
             font-weight: 600;
-            color: #764ba2;
-            margin-bottom: 10px;
-            font-size: 1rem;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
         }
 
-        .translation-row {
-            animation: fadeIn 0.5s ease-out;
+        .filter-tab {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
         }
 
+        .filter-tab:hover {
+            background: var(--bg-secondary);
+        }
+
+        .filter-tab.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .translations-list {
+            max-height: calc(100vh - 400px);
+            overflow-y: auto;
+        }
+
+        .translation-group {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .translation-group:last-child {
+            border-bottom: none;
+        }
+
+        .translation-group-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--accent-primary);
+            transition: background 0.2s;
+        }
+
+        .translation-group-header:hover {
+            background: var(--accent-light);
+        }
+
+        .translation-group-header svg {
+            transition: transform 0.2s;
+        }
+
+        .translation-group-header.collapsed svg {
+            transform: rotate(-90deg);
+        }
+
+        .translation-group-content {
+            display: block;
+        }
+
+        .translation-group-content.collapsed {
+            display: none;
+        }
+
+        .translation-item {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+
+        .translation-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .translation-item:last-child {
+            border-bottom: none;
+        }
+
+        .translation-key-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .translation-key-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .translation-key-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .translation-values {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .translation-value-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .translation-value-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .translation-value-input {
+            padding: 10px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            resize: vertical;
+            min-height: 40px;
+        }
+
+        .translation-value-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .translation-value-input.empty {
+            border-color: var(--warning);
+            background: var(--warning-light);
+        }
+
+        .translation-value-input.modified {
+            border-color: var(--success);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        /* Export Panel */
+        .export-panel {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .export-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .export-panel h2 {
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .storage-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--success-light);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            color: var(--success);
+        }
+
+        .storage-indicator.saving {
+            background: var(--warning-light);
+            color: var(--warning);
+        }
+
+        .storage-indicator svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .export-section {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .export-section h4 {
+            font-size: 0.875rem;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .export-language-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .export-language-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+        }
+
+        .export-language-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .export-language-code {
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .export-language-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .download-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--accent-primary);
+            color: white;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .download-btn:hover {
+            background: var(--accent-secondary);
+            transform: scale(1.05);
+        }
+
+        .export-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .export-actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Data Management */
+        .data-section {
+            margin-top: auto;
+        }
+
+        .data-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .data-info svg {
+            flex-shrink: 0;
+        }
+
+        .danger-zone {
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            background: var(--danger-light);
+        }
+
+        .danger-zone h4 {
+            color: var(--danger);
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+        }
+
+        .danger-zone p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            border-left: 4px solid var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.warning { border-left-color: var(--warning); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Add Key Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            width: 100%;
+            max-width: 500px;
+            margin: 16px;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h3 {
+            margin-bottom: 16px;
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-                margin: 10px;
-            }
-            
-            h1 {
-                font-size: 2rem;
-            }
-            
-            .file-input-group {
-                flex-direction: column;
-            }
-            
-            .add-language-section {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .translation-inputs {
+            .translation-item {
                 grid-template-columns: 1fr;
             }
+            .stats-bar {
+                flex-direction: column;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌐 Translation Editor</h1>
-        
-        <div class="upload-section">
-            <div class="file-input-group">
-                <div class="file-input-container">
-                    <label for="itFile">Italian (IT)</label>
-                    <input type="file" id="itFile" class="file-input" accept=".json">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                    </svg>
                 </div>
-                <div class="file-input-container">
-                    <label for="enFile">English (EN)</label>
-                    <input type="file" id="enFile" class="file-input" accept=".json">
-                </div>
-                <div class="file-input-container">
-                    <label for="jpFile">Japanese (JP)</label>
-                    <input type="file" id="jpFile" class="file-input" accept=".json">
+                <span>Translation Manager</span>
+            </div>
+
+            <div>
+                <div class="section-title">Languages</div>
+                <div class="language-list" id="languageList"></div>
+            </div>
+
+            <div>
+                <div class="section-title">Add Language</div>
+                <div class="add-language-form">
+                    <input type="text" id="newLanguageInput" placeholder="e.g., fr, de, es" maxlength="10">
+                    <button onclick="addLanguage()">Add</button>
                 </div>
             </div>
-            <div style="text-align: center;">
-                <button class="btn btn-primary" onclick="loadFiles()">Load Translation Files</button>
+
+            <div class="theme-toggle">
+                <span>Dark Mode</span>
+                <div class="toggle-switch" id="themeToggle" onclick="toggleTheme()"></div>
             </div>
-        </div>
+        </aside>
 
-        <div class="language-manager">
-            <h3 style="margin-bottom: 20px; color: #333;">Languages</h3>
-            <div class="language-tabs" id="languageTabs"></div>
-            <div class="add-language-section">
-                <input type="text" id="newLanguageCode" class="add-language-input" placeholder="Language code (e.g., fr, de)" maxlength="5">
-                <button class="btn btn-primary" onclick="addLanguage()">Add Language</button>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <div class="search-box">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search translations..." oninput="filterTranslations()">
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="openAddKeyModal()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Key
+                    </button>
+                    <button class="mobile-menu-btn" onclick="toggleExportPanel()" style="margin-left: 8px;">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Drop Zone -->
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                </div>
+                <h3>Drop JSON files here</h3>
+                <p>or click to browse. Files should be named with language code (e.g., en.json, fr.json)</p>
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    Browse Files
+                </button>
+                <input type="file" id="fileInput" multiple accept=".json" onchange="handleFileSelect(event)">
             </div>
-        </div>
 
-        <div class="status" id="status"></div>
+            <!-- Stats Bar -->
+            <div class="stats-bar" id="statsBar" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="statLanguages">0</div>
+                    <div class="stat-label">Languages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statKeys">0</div>
+                    <div class="stat-label">Translation Keys</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statTranslated">0%</div>
+                    <div class="stat-label">Translated</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statMissing">0</div>
+                    <div class="stat-label">Missing</div>
+                </div>
+            </div>
 
-        <div class="editor-section">
-            <h3 style="margin-bottom: 20px; color: #333;">Translation Editor</h3>
-            <div class="translation-grid" id="translationGrid"></div>
-        </div>
+            <!-- Translation Editor -->
+            <div class="translation-editor" id="translationEditor" style="display: none;">
+                <div class="editor-toolbar">
+                    <span class="editor-title">Translation Keys</span>
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">All</button>
+                        <button class="filter-tab" data-filter="missing" onclick="setFilter('missing')">Missing</button>
+                        <button class="filter-tab" data-filter="translated" onclick="setFilter('translated')">Complete</button>
+                    </div>
+                </div>
+                <div class="translations-list" id="translationsList"></div>
+            </div>
 
-        <div class="actions">
-            <button class="btn btn-success" onclick="downloadTranslations()">Download All Translations</button>
-            <button class="btn btn-primary" onclick="downloadSingle()">Download Current Language</button>
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3>No translations yet</h3>
+                <p>Drop JSON translation files above or add a new language to get started</p>
+            </div>
+        </main>
+
+        <!-- Export Panel -->
+        <aside class="export-panel" id="exportPanel">
+            <div class="export-panel-header">
+                <h2>Export & Download</h2>
+                <div class="storage-indicator" id="storageIndicator">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span>Auto-saved</span>
+                </div>
+            </div>
+
+            <div class="export-section">
+                <h4>Download Individual Languages</h4>
+                <div class="export-language-list" id="exportLanguageList"></div>
+            </div>
+
+            <div class="export-section">
+                <h4>Bulk Export</h4>
+                <div class="export-actions">
+                    <button class="btn btn-primary" onclick="downloadAll()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download All (.json)
+                    </button>
+                    <button class="btn btn-secondary" onclick="copyAllToClipboard()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        Copy to Clipboard
+                    </button>
+                </div>
+            </div>
+
+            <div class="data-section">
+                <div class="data-info">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>All changes are automatically saved to your browser's local storage</span>
+                </div>
+                <div class="danger-zone">
+                    <h4>Danger Zone</h4>
+                    <p>Clear all stored data and start fresh. This cannot be undone.</p>
+                    <button class="btn btn-danger" onclick="clearAllData()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Clear All Data
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenus()"></div>
+
+    <!-- Add Key Modal -->
+    <div class="modal-overlay" id="addKeyModal">
+        <div class="modal">
+            <h3>Add Translation Key</h3>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="newKeyPath">Key Path</label>
+                    <input type="text" id="newKeyPath" placeholder="e.g., common.buttons.submit">
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeAddKeyModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="addNewKey()">Add Key</button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
+        // ========================
+        // State Management
+        // ========================
+        const DB_NAME = 'TranslationManagerDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'translations';
+
+        let db = null;
         let translations = {};
-        let languages = ['it', 'en', 'jp'];
-        let currentLanguage = 'it';
-        let translationStructure = {};
+        let languages = [];
+        let translationKeys = [];
+        let currentFilter = 'all';
+        let searchQuery = '';
+        let saveTimeout = null;
 
-        function showStatus(message, type = 'success') {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-            setTimeout(() => {
-                status.style.display = 'none';
-            }, 3000);
-        }
+        // ========================
+        // IndexedDB Operations
+        // ========================
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-        function updateLanguageTabs() {
-            const container = document.getElementById('languageTabs');
-            container.innerHTML = '';
-            
-            languages.forEach(lang => {
-                const tab = document.createElement('div');
-                tab.className = `language-tab ${lang === currentLanguage ? 'active' : ''}`;
-                tab.innerHTML = `
-                    ${lang.toUpperCase()}
-                    ${languages.length > 1 ? `<button class="remove-language" onclick="removeLanguage('${lang}')" title="Remove language">×</button>` : ''}
-                `;
-                tab.onclick = (e) => {
-                    if (e.target.classList.contains('remove-language')) return;
-                    currentLanguage = lang;
-                    updateLanguageTabs();
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
                 };
-                container.appendChild(tab);
+
+                request.onupgradeneeded = (event) => {
+                    const database = event.target.result;
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
             });
         }
 
-        function addLanguage() {
-            const input = document.getElementById('newLanguageCode');
-            const newLang = input.value.trim().toLowerCase();
-            
-            if (!newLang) {
-                showStatus('Please enter a language code', 'error');
-                return;
-            }
-            
-            if (languages.includes(newLang)) {
-                showStatus('Language already exists', 'error');
-                return;
-            }
-            
-            languages.push(newLang);
-            translations[newLang] = {};
-            
-            // Initialize new language with empty values based on structure
-            function initializeStructure(obj, target) {
-                for (const key in obj) {
-                    if (typeof obj[key] === 'object' && obj[key] !== null) {
-                        target[key] = {};
-                        initializeStructure(obj[key], target[key]);
+        async function saveToStorage() {
+            if (!db) return;
+
+            const indicator = document.getElementById('storageIndicator');
+            indicator.classList.add('saving');
+            indicator.innerHTML = `
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="animation: spin 1s linear infinite">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span>Saving...</span>
+            `;
+
+            const data = {
+                id: 'main',
+                translations,
+                languages,
+                translationKeys,
+                theme: document.documentElement.getAttribute('data-theme'),
+                lastSaved: new Date().toISOString()
+            };
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.put(data);
+
+            transaction.oncomplete = () => {
+                setTimeout(() => {
+                    indicator.classList.remove('saving');
+                    indicator.innerHTML = `
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span>Auto-saved</span>
+                    `;
+                }, 500);
+            };
+        }
+
+        async function loadFromStorage() {
+            if (!db) return false;
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get('main');
+
+                request.onsuccess = () => {
+                    const data = request.result;
+                    if (data) {
+                        translations = data.translations || {};
+                        languages = data.languages || [];
+                        translationKeys = data.translationKeys || [];
+                        if (data.theme) {
+                            document.documentElement.setAttribute('data-theme', data.theme);
+                            if (data.theme === 'dark') {
+                                document.getElementById('themeToggle').classList.add('active');
+                            }
+                        }
+                        resolve(true);
                     } else {
-                        target[key] = '';
+                        resolve(false);
                     }
+                };
+
+                request.onerror = () => resolve(false);
+            });
+        }
+
+        function debouncedSave() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => saveToStorage(), 500);
+        }
+
+        // ========================
+        // UI Rendering
+        // ========================
+        function renderLanguageList() {
+            const container = document.getElementById('languageList');
+            container.innerHTML = '';
+
+            languages.forEach(lang => {
+                const hasTranslations = translations[lang] && Object.keys(translations[lang]).length > 0;
+                const translatedCount = countTranslated(lang);
+                const totalKeys = translationKeys.length;
+
+                const item = document.createElement('div');
+                item.className = `language-item ${!hasTranslations ? 'empty' : ''}`;
+                item.innerHTML = `
+                    <div class="language-flag">${lang.toUpperCase()}</div>
+                    <div class="language-info">
+                        <div class="language-name">${getLanguageName(lang)}</div>
+                        <div class="language-stats">${translatedCount}/${totalKeys} translated</div>
+                    </div>
+                    <div class="language-actions">
+                        <button class="icon-btn upload" title="Upload file" onclick="event.stopPropagation(); uploadForLanguage('${lang}')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                            </svg>
+                        </button>
+                        ${languages.length > 1 ? `
+                        <button class="icon-btn" title="Remove language" onclick="event.stopPropagation(); removeLanguage('${lang}')">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderExportList() {
+            const container = document.getElementById('exportLanguageList');
+            container.innerHTML = '';
+
+            if (languages.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; padding: 12px;">No languages added yet</p>';
+                return;
+            }
+
+            languages.forEach(lang => {
+                const translatedCount = countTranslated(lang);
+                const item = document.createElement('div');
+                item.className = 'export-language-item';
+                item.innerHTML = `
+                    <div class="export-language-info">
+                        <span class="export-language-code">${lang}</span>
+                        <span class="export-language-count">${translatedCount} keys</span>
+                    </div>
+                    <button class="download-btn" title="Download ${lang}.json" onclick="downloadLanguage('${lang}')">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderTranslations() {
+            const container = document.getElementById('translationsList');
+            const editor = document.getElementById('translationEditor');
+            const emptyState = document.getElementById('emptyState');
+            const statsBar = document.getElementById('statsBar');
+
+            if (translationKeys.length === 0) {
+                editor.style.display = 'none';
+                statsBar.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            editor.style.display = 'block';
+            statsBar.style.display = 'flex';
+            emptyState.style.display = 'none';
+
+            updateStats();
+
+            // Group keys by prefix
+            const groups = {};
+            const flatKeys = [];
+
+            translationKeys.forEach(key => {
+                const parts = key.split('.');
+                if (parts.length > 1) {
+                    const group = parts[0];
+                    if (!groups[group]) groups[group] = [];
+                    groups[group].push(key);
+                } else {
+                    flatKeys.push(key);
                 }
+            });
+
+            container.innerHTML = '';
+
+            // Filter keys
+            const filteredGroups = {};
+            const filteredFlatKeys = flatKeys.filter(key => filterKey(key));
+
+            Object.entries(groups).forEach(([group, keys]) => {
+                const filtered = keys.filter(key => filterKey(key));
+                if (filtered.length > 0) {
+                    filteredGroups[group] = filtered;
+                }
+            });
+
+            // Render flat keys first
+            if (filteredFlatKeys.length > 0) {
+                filteredFlatKeys.forEach(key => {
+                    container.appendChild(createTranslationItem(key, key));
+                });
             }
-            
-            if (Object.keys(translationStructure).length > 0) {
-                initializeStructure(translationStructure, translations[newLang]);
+
+            // Render grouped keys
+            Object.entries(filteredGroups).forEach(([group, keys]) => {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'translation-group';
+
+                const header = document.createElement('div');
+                header.className = 'translation-group-header';
+                header.innerHTML = `
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    <span>${group}</span>
+                    <span style="margin-left: auto; font-size: 0.75rem; color: var(--text-muted);">${keys.length} keys</span>
+                `;
+                header.onclick = () => {
+                    header.classList.toggle('collapsed');
+                    content.classList.toggle('collapsed');
+                };
+
+                const content = document.createElement('div');
+                content.className = 'translation-group-content';
+
+                keys.forEach(key => {
+                    const shortKey = key.split('.').slice(1).join('.');
+                    content.appendChild(createTranslationItem(key, shortKey));
+                });
+
+                groupEl.appendChild(header);
+                groupEl.appendChild(content);
+                container.appendChild(groupEl);
+            });
+
+            if (container.children.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No translations match your filters</p></div>';
             }
-            
+        }
+
+        function createTranslationItem(fullKey, displayKey) {
+            const item = document.createElement('div');
+            item.className = 'translation-item';
+            item.dataset.key = fullKey;
+
+            const keyCell = document.createElement('div');
+            keyCell.className = 'translation-key-cell';
+            keyCell.innerHTML = `
+                <span class="translation-key-name">${displayKey}</span>
+                ${fullKey !== displayKey ? `<span class="translation-key-path">${fullKey}</span>` : ''}
+            `;
+
+            const valuesCell = document.createElement('div');
+            valuesCell.className = 'translation-values';
+
+            languages.forEach(lang => {
+                const value = getNestedValue(translations[lang] || {}, fullKey) || '';
+                const isEmpty = !value.trim();
+
+                const group = document.createElement('div');
+                group.className = 'translation-value-group';
+                group.innerHTML = `
+                    <label class="translation-value-label">${lang.toUpperCase()}</label>
+                    <input type="text"
+                           class="translation-value-input ${isEmpty ? 'empty' : ''}"
+                           value="${escapeHtml(value)}"
+                           placeholder="Enter ${lang.toUpperCase()} translation..."
+                           data-lang="${lang}"
+                           data-key="${fullKey}"
+                           oninput="updateTranslation(this)">
+                `;
+                valuesCell.appendChild(group);
+            });
+
+            item.appendChild(keyCell);
+            item.appendChild(valuesCell);
+            return item;
+        }
+
+        function filterKey(key) {
+            // Search filter
+            if (searchQuery && !key.toLowerCase().includes(searchQuery.toLowerCase())) {
+                // Also check values
+                let matchesValue = false;
+                languages.forEach(lang => {
+                    const value = getNestedValue(translations[lang] || {}, key) || '';
+                    if (value.toLowerCase().includes(searchQuery.toLowerCase())) {
+                        matchesValue = true;
+                    }
+                });
+                if (!matchesValue) return false;
+            }
+
+            // Status filter
+            if (currentFilter === 'missing') {
+                let hasMissing = false;
+                languages.forEach(lang => {
+                    const value = getNestedValue(translations[lang] || {}, key) || '';
+                    if (!value.trim()) hasMissing = true;
+                });
+                return hasMissing;
+            }
+
+            if (currentFilter === 'translated') {
+                let allComplete = true;
+                languages.forEach(lang => {
+                    const value = getNestedValue(translations[lang] || {}, key) || '';
+                    if (!value.trim()) allComplete = false;
+                });
+                return allComplete;
+            }
+
+            return true;
+        }
+
+        function updateStats() {
+            document.getElementById('statLanguages').textContent = languages.length;
+            document.getElementById('statKeys').textContent = translationKeys.length;
+
+            let totalTranslated = 0;
+            let totalPossible = languages.length * translationKeys.length;
+
+            languages.forEach(lang => {
+                totalTranslated += countTranslated(lang);
+            });
+
+            const percentage = totalPossible > 0 ? Math.round((totalTranslated / totalPossible) * 100) : 0;
+            document.getElementById('statTranslated').textContent = percentage + '%';
+            document.getElementById('statMissing').textContent = totalPossible - totalTranslated;
+        }
+
+        function countTranslated(lang) {
+            let count = 0;
+            translationKeys.forEach(key => {
+                const value = getNestedValue(translations[lang] || {}, key) || '';
+                if (value.trim()) count++;
+            });
+            return count;
+        }
+
+        // ========================
+        // Language Management
+        // ========================
+        function addLanguage() {
+            const input = document.getElementById('newLanguageInput');
+            const code = input.value.trim().toLowerCase();
+
+            if (!code) {
+                showToast('Please enter a language code', 'error');
+                return;
+            }
+
+            if (languages.includes(code)) {
+                showToast('Language already exists', 'error');
+                return;
+            }
+
+            languages.push(code);
+            translations[code] = {};
+
+            // Initialize with empty values for all existing keys
+            translationKeys.forEach(key => {
+                setNestedValue(translations[code], key, '');
+            });
+
             input.value = '';
-            updateLanguageTabs();
-            renderTranslations();
-            showStatus(`Language ${newLang.toUpperCase()} added successfully`);
+            renderAll();
+            debouncedSave();
+            showToast(`Added language: ${code.toUpperCase()}`, 'success');
         }
 
         function removeLanguage(lang) {
             if (languages.length <= 1) {
-                showStatus('Cannot remove the last language', 'error');
+                showToast('Cannot remove the last language', 'error');
                 return;
             }
-            
+
+            if (!confirm(`Remove ${lang.toUpperCase()} and all its translations?`)) return;
+
             languages = languages.filter(l => l !== lang);
             delete translations[lang];
-            
-            if (currentLanguage === lang) {
-                currentLanguage = languages[0];
-            }
-            
-            updateLanguageTabs();
-            renderTranslations();
-            showStatus(`Language ${lang.toUpperCase()} removed`);
+
+            renderAll();
+            debouncedSave();
+            showToast(`Removed language: ${lang.toUpperCase()}`, 'success');
         }
 
-        async function loadFiles() {
-            const fileInputs = {
-                it: document.getElementById('itFile'),
-                en: document.getElementById('enFile'),
-                jp: document.getElementById('jpFile')
-            };
-
-            let loadedCount = 0;
-            translations = {};
-
-            for (const [lang, input] of Object.entries(fileInputs)) {
-                if (input.files.length > 0) {
+        function uploadForLanguage(lang) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
                     try {
-                        const file = input.files[0];
                         const content = await file.text();
                         const data = JSON.parse(content);
                         translations[lang] = data;
-                        loadedCount++;
-                    } catch (error) {
-                        showStatus(`Error loading ${lang.toUpperCase()} file: ${error.message}`, 'error');
-                        return;
+                        extractKeys(data);
+                        renderAll();
+                        debouncedSave();
+                        showToast(`Loaded translations for ${lang.toUpperCase()}`, 'success');
+                    } catch (err) {
+                        showToast('Error parsing JSON file', 'error');
                     }
                 }
-            }
-
-            if (loadedCount === 0) {
-                showStatus('Please select at least one file to load', 'error');
-                return;
-            }
-
-            // Build translation structure from the first loaded file
-            const firstLang = Object.keys(translations)[0];
-            translationStructure = JSON.parse(JSON.stringify(translations[firstLang]));
-
-            // Update languages list based on loaded files
-            languages = Object.keys(translations);
-            currentLanguage = languages[0];
-
-            updateLanguageTabs();
-            renderTranslations();
-            showStatus(`Successfully loaded ${loadedCount} translation file(s)`);
+            };
+            input.click();
         }
 
-        function renderTranslations() {
-            const container = document.getElementById('translationGrid');
-            container.innerHTML = '';
+        // ========================
+        // File Handling
+        // ========================
+        function setupDropZone() {
+            const dropZone = document.getElementById('dropZone');
 
-            if (Object.keys(translations).length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">Load translation files to start editing</p>';
-                return;
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
             }
 
-            function renderLevel(obj, parentKey = '', level = 0) {
-                for (const key in obj) {
-                    const fullKey = parentKey ? `${parentKey}.${key}` : key;
-                    
-                    if (typeof obj[key] === 'object' && obj[key] !== null) {
-                        // Nested object
-                        const nestedContainer = document.createElement('div');
-                        nestedContainer.className = level > 0 ? 'nested-section' : 'translation-row';
-                        
-                        const keyHeader = document.createElement('div');
-                        keyHeader.className = level > 0 ? 'nested-key' : 'translation-key';
-                        keyHeader.textContent = key;
-                        nestedContainer.appendChild(keyHeader);
-                        
-                        container.appendChild(nestedContainer);
-                        
-                        // Render nested items
-                        const tempObj = { [key]: obj[key] };
-                        const tempContainer = container;
-                        container.innerHTML += `<div class="nested-section" id="nested-${fullKey.replace(/\./g, '-')}"></div>`;
-                        
-                        setTimeout(() => {
-                            const nestedDiv = document.getElementById(`nested-${fullKey.replace(/\./g, '-')}`);
-                            if (nestedDiv) {
-                                renderNestedItems(obj[key], fullKey, nestedDiv);
-                            }
-                        }, 0);
-                    } else {
-                        // Regular translation item
-                        const row = document.createElement('div');
-                        row.className = 'translation-row';
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+            });
 
-                        const keyDiv = document.createElement('div');
-                        keyDiv.className = 'translation-key';
-                        keyDiv.textContent = fullKey;
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+            });
 
-                        const inputsDiv = document.createElement('div');
-                        inputsDiv.className = 'translation-inputs';
+            dropZone.addEventListener('drop', handleDrop, false);
+        }
 
-                        languages.forEach(lang => {
-                            const group = document.createElement('div');
-                            group.className = 'translation-input-group';
+        async function handleDrop(e) {
+            const files = e.dataTransfer.files;
+            await processFiles(files);
+        }
 
-                            const label = document.createElement('label');
-                            label.textContent = lang.toUpperCase();
+        async function handleFileSelect(e) {
+            const files = e.target.files;
+            await processFiles(files);
+            e.target.value = '';
+        }
 
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.className = 'translation-input';
-                            input.value = getNestedValue(translations[lang] || {}, fullKey) || '';
-                            input.onchange = () => updateTranslation(lang, fullKey, input.value);
+        async function processFiles(files) {
+            let loaded = 0;
 
-                            group.appendChild(label);
-                            group.appendChild(input);
-                            inputsDiv.appendChild(group);
-                        });
+            for (const file of files) {
+                if (!file.name.endsWith('.json')) continue;
 
-                        row.appendChild(keyDiv);
-                        row.appendChild(inputsDiv);
-                        container.appendChild(row);
+                try {
+                    const content = await file.text();
+                    const data = JSON.parse(content);
+
+                    // Extract language code from filename
+                    let lang = file.name.replace('.json', '').toLowerCase();
+                    // Handle common patterns like "en-US.json" -> "en-us"
+                    lang = lang.split('/').pop();
+
+                    if (!languages.includes(lang)) {
+                        languages.push(lang);
                     }
+
+                    translations[lang] = data;
+                    extractKeys(data);
+                    loaded++;
+                } catch (err) {
+                    showToast(`Error loading ${file.name}: ${err.message}`, 'error');
                 }
             }
 
-            function renderNestedItems(obj, parentKey, container) {
-                for (const key in obj) {
-                    const fullKey = `${parentKey}.${key}`;
-                    
-                    if (typeof obj[key] === 'object' && obj[key] !== null) {
-                        const keyHeader = document.createElement('div');
-                        keyHeader.className = 'nested-key';
-                        keyHeader.textContent = key;
-                        container.appendChild(keyHeader);
-                        
-                        renderNestedItems(obj[key], fullKey, container);
-                    } else {
-                        const row = document.createElement('div');
-                        row.className = 'translation-row';
-                        row.style.marginLeft = '0';
-                        row.style.borderLeft = '3px solid #7bed9f';
+            if (loaded > 0) {
+                renderAll();
+                debouncedSave();
+                showToast(`Loaded ${loaded} file(s)`, 'success');
+            }
+        }
 
-                        const keyDiv = document.createElement('div');
-                        keyDiv.className = 'nested-key';
-                        keyDiv.textContent = key;
-
-                        const inputsDiv = document.createElement('div');
-                        inputsDiv.className = 'translation-inputs';
-
-                        languages.forEach(lang => {
-                            const group = document.createElement('div');
-                            group.className = 'translation-input-group';
-
-                            const label = document.createElement('label');
-                            label.textContent = lang.toUpperCase();
-
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.className = 'translation-input';
-                            input.value = getNestedValue(translations[lang] || {}, fullKey) || '';
-                            input.onchange = () => updateTranslation(lang, fullKey, input.value);
-
-                            group.appendChild(label);
-                            group.appendChild(input);
-                            inputsDiv.appendChild(group);
-                        });
-
-                        row.appendChild(keyDiv);
-                        row.appendChild(inputsDiv);
-                        container.appendChild(row);
+        function extractKeys(obj, prefix = '') {
+            for (const key in obj) {
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    extractKeys(obj[key], fullKey);
+                } else {
+                    if (!translationKeys.includes(fullKey)) {
+                        translationKeys.push(fullKey);
                     }
                 }
             }
+        }
 
-            // Get the structure from the first available translation
-            const firstLang = Object.keys(translations)[0];
-            if (firstLang && translations[firstLang]) {
-                renderLevel(translations[firstLang]);
+        // ========================
+        // Translation Operations
+        // ========================
+        function updateTranslation(input) {
+            const lang = input.dataset.lang;
+            const key = input.dataset.key;
+            const value = input.value;
+
+            if (!translations[lang]) {
+                translations[lang] = {};
             }
+
+            setNestedValue(translations[lang], key, value);
+
+            // Update input styling
+            input.classList.toggle('empty', !value.trim());
+
+            debouncedSave();
+            updateStats();
+            renderLanguageList();
+            renderExportList();
         }
 
         function getNestedValue(obj, path) {
-            return path.split('.').reduce((current, key) => current && current[key], obj);
+            return path.split('.').reduce((curr, key) => curr && curr[key], obj);
         }
 
         function setNestedValue(obj, path, value) {
             const keys = path.split('.');
             const lastKey = keys.pop();
-            const target = keys.reduce((current, key) => {
-                if (!current[key]) current[key] = {};
-                return current[key];
+            const target = keys.reduce((curr, key) => {
+                if (!curr[key]) curr[key] = {};
+                return curr[key];
             }, obj);
             target[lastKey] = value;
         }
 
-        function updateTranslation(lang, key, value) {
+        // ========================
+        // Add Key Modal
+        // ========================
+        function openAddKeyModal() {
+            document.getElementById('addKeyModal').classList.add('active');
+            document.getElementById('newKeyPath').focus();
+        }
+
+        function closeAddKeyModal() {
+            document.getElementById('addKeyModal').classList.remove('active');
+            document.getElementById('newKeyPath').value = '';
+        }
+
+        function addNewKey() {
+            const input = document.getElementById('newKeyPath');
+            const key = input.value.trim();
+
+            if (!key) {
+                showToast('Please enter a key path', 'error');
+                return;
+            }
+
+            if (translationKeys.includes(key)) {
+                showToast('Key already exists', 'error');
+                return;
+            }
+
+            translationKeys.push(key);
+
+            // Add empty values for all languages
+            languages.forEach(lang => {
+                if (!translations[lang]) translations[lang] = {};
+                setNestedValue(translations[lang], key, '');
+            });
+
+            closeAddKeyModal();
+            renderAll();
+            debouncedSave();
+            showToast(`Added key: ${key}`, 'success');
+        }
+
+        // ========================
+        // Download Functions
+        // ========================
+        function downloadLanguage(lang) {
             if (!translations[lang]) {
-                translations[lang] = {};
-            }
-            setNestedValue(translations[lang], key, value);
-        }
-
-        function downloadTranslations() {
-            if (Object.keys(translations).length === 0) {
-                showStatus('No translations to download', 'error');
+                showToast('No translations for this language', 'error');
                 return;
             }
 
-            const zip = {};
-            for (const [lang, data] of Object.entries(translations)) {
-                zip[`${lang}.json`] = JSON.stringify(data, null, 2);
-            }
-
-            // Create and download individual files
-            for (const [filename, content] of Object.entries(zip)) {
-                const blob = new Blob([content], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-
-            showStatus('All translations downloaded successfully');
+            const content = JSON.stringify(translations[lang], null, 2);
+            downloadFile(`${lang}.json`, content, 'application/json');
+            showToast(`Downloaded ${lang}.json`, 'success');
         }
 
-        function downloadSingle() {
-            if (!translations[currentLanguage]) {
-                showStatus('No translation data for current language', 'error');
+        function downloadAll() {
+            if (languages.length === 0) {
+                showToast('No languages to download', 'error');
                 return;
             }
 
-            const content = JSON.stringify(translations[currentLanguage], null, 2);
-            const blob = new Blob([content], { type: 'application/json' });
+            languages.forEach(lang => {
+                if (translations[lang]) {
+                    const content = JSON.stringify(translations[lang], null, 2);
+                    downloadFile(`${lang}.json`, content, 'application/json');
+                }
+            });
+
+            showToast(`Downloaded ${languages.length} file(s)`, 'success');
+        }
+
+        function downloadFile(filename, content, type) {
+            const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${currentLanguage}.json`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            showStatus(`${currentLanguage.toUpperCase()} translation downloaded`);
         }
 
-        // Initialize the app
-        updateLanguageTabs();
-        renderTranslations();
+        async function copyAllToClipboard() {
+            const allTranslations = {};
+            languages.forEach(lang => {
+                allTranslations[lang] = translations[lang] || {};
+            });
+
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(allTranslations, null, 2));
+                showToast('Copied to clipboard', 'success');
+            } catch (err) {
+                showToast('Failed to copy', 'error');
+            }
+        }
+
+        // ========================
+        // Data Management
+        // ========================
+        async function clearAllData() {
+            if (!confirm('Are you sure you want to clear all data? This cannot be undone.')) return;
+
+            translations = {};
+            languages = [];
+            translationKeys = [];
+
+            if (db) {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                store.delete('main');
+            }
+
+            renderAll();
+            showToast('All data cleared', 'success');
+        }
+
+        // ========================
+        // Filter & Search
+        // ========================
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            renderTranslations();
+        }
+
+        function filterTranslations() {
+            searchQuery = document.getElementById('searchInput').value;
+            renderTranslations();
+        }
+
+        // ========================
+        // Theme
+        // ========================
+        function toggleTheme() {
+            const toggle = document.getElementById('themeToggle');
+            toggle.classList.toggle('active');
+
+            const isDark = toggle.classList.contains('active');
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            debouncedSave();
+        }
+
+        // ========================
+        // Mobile Navigation
+        // ========================
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('mobile-open');
+            document.getElementById('mobileOverlay').classList.toggle('active');
+        }
+
+        function toggleExportPanel() {
+            document.getElementById('exportPanel').classList.toggle('mobile-open');
+            document.getElementById('mobileOverlay').classList.toggle('active');
+        }
+
+        function closeMobileMenus() {
+            document.getElementById('sidebar').classList.remove('mobile-open');
+            document.getElementById('exportPanel').classList.remove('mobile-open');
+            document.getElementById('mobileOverlay').classList.remove('active');
+        }
+
+        // ========================
+        // Utilities
+        // ========================
+        function getLanguageName(code) {
+            const names = {
+                en: 'English', it: 'Italian', jp: 'Japanese', ja: 'Japanese',
+                fr: 'French', de: 'German', es: 'Spanish', pt: 'Portuguese',
+                ru: 'Russian', zh: 'Chinese', ko: 'Korean', ar: 'Arabic',
+                nl: 'Dutch', pl: 'Polish', tr: 'Turkish', sv: 'Swedish',
+                da: 'Danish', fi: 'Finnish', no: 'Norwegian', cs: 'Czech',
+                hu: 'Hungarian', ro: 'Romanian', uk: 'Ukrainian', vi: 'Vietnamese',
+                th: 'Thai', id: 'Indonesian', ms: 'Malay', hi: 'Hindi'
+            };
+            return names[code] || code.toUpperCase();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.replace(/"/g, '&quot;');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    ${type === 'success'
+                        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>'
+                        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'}
+                </svg>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function renderAll() {
+            renderLanguageList();
+            renderExportList();
+            renderTranslations();
+        }
+
+        // ========================
+        // Keyboard Shortcuts
+        // ========================
+        document.addEventListener('keydown', (e) => {
+            // Close modal on Escape
+            if (e.key === 'Escape') {
+                closeAddKeyModal();
+                closeMobileMenus();
+            }
+
+            // Enter to add key in modal
+            if (e.key === 'Enter' && document.getElementById('addKeyModal').classList.contains('active')) {
+                addNewKey();
+            }
+
+            // Ctrl/Cmd + S to save (prevent browser save)
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveToStorage();
+                showToast('Saved', 'success');
+            }
+
+            // Ctrl/Cmd + F to focus search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+        });
+
+        // Add keyframe animation for saving spinner
+        const style = document.createElement('style');
+        style.textContent = `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+
+        // ========================
+        // Initialize App
+        // ========================
+        async function init() {
+            await initDB();
+            const hasData = await loadFromStorage();
+
+            setupDropZone();
+            renderAll();
+
+            if (hasData) {
+                showToast('Data restored from storage', 'success');
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>
