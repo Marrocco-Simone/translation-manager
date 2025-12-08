@@ -1143,16 +1143,34 @@
                 </div>
             </div>
 
+            <div class="export-section">
+                <h4>Backup & Restore</h4>
+                <div class="export-actions">
+                    <button class="btn btn-success" onclick="exportFullBackup()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                        </svg>
+                        Export Full Backup
+                    </button>
+                    <button class="btn btn-secondary" onclick="importFullBackup()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Import Backup
+                    </button>
+                </div>
+            </div>
+
             <div class="data-section">
                 <div class="data-info">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>All changes are automatically saved to your browser's local storage</span>
+                    <span>Data is saved to both IndexedDB and localStorage for reliability</span>
                 </div>
                 <div class="danger-zone">
                     <h4>Danger Zone</h4>
-                    <p>Clear all stored data and start fresh. This cannot be undone.</p>
+                    <p>Clear all stored data and start fresh. Export backup first!</p>
                     <button class="btn btn-danger" onclick="clearAllData()">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -1194,6 +1212,8 @@
         const DB_NAME = 'TranslationManagerDB';
         const DB_VERSION = 1;
         const STORE_NAME = 'translations';
+        const LS_KEY = 'TranslationManager_backup';
+        const LS_TIMESTAMP_KEY = 'TranslationManager_lastSaved';
 
         let db = null;
         let translations = {};
@@ -1202,101 +1222,252 @@
         let currentFilter = 'all';
         let searchQuery = '';
         let saveTimeout = null;
+        let isSaving = false;
+        let pendingSave = false;
+        let lastSavedTimestamp = null;
 
         // ========================
-        // IndexedDB Operations
+        // Storage Operations (IndexedDB + localStorage backup)
         // ========================
         async function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                try {
+                    const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    db = request.result;
-                    resolve(db);
-                };
+                    request.onerror = () => {
+                        console.warn('IndexedDB failed, will use localStorage only');
+                        resolve(null);
+                    };
 
-                request.onupgradeneeded = (event) => {
-                    const database = event.target.result;
-                    if (!database.objectStoreNames.contains(STORE_NAME)) {
-                        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                    }
-                };
+                    request.onsuccess = () => {
+                        db = request.result;
+                        resolve(db);
+                    };
+
+                    request.onupgradeneeded = (event) => {
+                        const database = event.target.result;
+                        if (!database.objectStoreNames.contains(STORE_NAME)) {
+                            database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        }
+                    };
+                } catch (e) {
+                    console.warn('IndexedDB not available, will use localStorage only');
+                    resolve(null);
+                }
             });
         }
 
-        async function saveToStorage() {
-            if (!db) return;
-
-            const indicator = document.getElementById('storageIndicator');
-            indicator.classList.add('saving');
-            indicator.innerHTML = `
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="animation: spin 1s linear infinite">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span>Saving...</span>
-            `;
-
-            const data = {
+        function getStorageData() {
+            return {
                 id: 'main',
-                translations,
-                languages,
-                translationKeys,
+                version: 2, // Version for future migrations
+                translations: JSON.parse(JSON.stringify(translations)), // Deep clone
+                languages: [...languages],
+                translationKeys: [...translationKeys],
                 theme: document.documentElement.getAttribute('data-theme'),
                 lastSaved: new Date().toISOString()
             };
+        }
 
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            store.put(data);
+        // Save to localStorage (synchronous, always available)
+        function saveToLocalStorage(data) {
+            try {
+                const jsonStr = JSON.stringify(data);
+                localStorage.setItem(LS_KEY, jsonStr);
+                localStorage.setItem(LS_TIMESTAMP_KEY, data.lastSaved);
+                return true;
+            } catch (e) {
+                console.error('localStorage save failed:', e);
+                // Might be quota exceeded - try to save just essential data
+                try {
+                    const minimalData = {
+                        id: 'main',
+                        version: 2,
+                        translations: data.translations,
+                        languages: data.languages,
+                        translationKeys: data.translationKeys,
+                        lastSaved: data.lastSaved
+                    };
+                    localStorage.setItem(LS_KEY, JSON.stringify(minimalData));
+                    return true;
+                } catch (e2) {
+                    console.error('Even minimal localStorage save failed:', e2);
+                    return false;
+                }
+            }
+        }
 
-            transaction.oncomplete = () => {
-                setTimeout(() => {
-                    indicator.classList.remove('saving');
+        // Save to IndexedDB (async, more reliable for large data)
+        async function saveToIndexedDB(data) {
+            if (!db) return false;
+
+            return new Promise((resolve) => {
+                try {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    store.put(data);
+
+                    transaction.oncomplete = () => resolve(true);
+                    transaction.onerror = () => {
+                        console.error('IndexedDB transaction failed');
+                        resolve(false);
+                    };
+                } catch (e) {
+                    console.error('IndexedDB save error:', e);
+                    resolve(false);
+                }
+            });
+        }
+
+        async function saveToStorage(immediate = false) {
+            // Prevent concurrent saves
+            if (isSaving) {
+                pendingSave = true;
+                return;
+            }
+
+            isSaving = true;
+            const indicator = document.getElementById('storageIndicator');
+
+            if (indicator) {
+                indicator.classList.add('saving');
+                indicator.innerHTML = `
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="animation: spin 1s linear infinite">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>Saving...</span>
+                `;
+            }
+
+            const data = getStorageData();
+
+            // Always save to localStorage first (sync, fast, reliable)
+            const lsSaved = saveToLocalStorage(data);
+
+            // Then save to IndexedDB (async, better for large data)
+            const idbSaved = await saveToIndexedDB(data);
+
+            lastSavedTimestamp = data.lastSaved;
+
+            if (indicator) {
+                indicator.classList.remove('saving');
+                if (lsSaved || idbSaved) {
                     indicator.innerHTML = `
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        <span>Auto-saved</span>
+                        <span>Saved ${new Date(data.lastSaved).toLocaleTimeString()}</span>
                     `;
-                }, 500);
-            };
+                } else {
+                    indicator.innerHTML = `
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span>Save failed!</span>
+                    `;
+                    showToast('Failed to save data. Please export your work.', 'error');
+                }
+            }
+
+            isSaving = false;
+
+            // Process any pending save that was requested during this save
+            if (pendingSave) {
+                pendingSave = false;
+                setTimeout(() => saveToStorage(), 100);
+            }
+        }
+
+        // Load from localStorage
+        function loadFromLocalStorage() {
+            try {
+                const data = localStorage.getItem(LS_KEY);
+                if (data) {
+                    return JSON.parse(data);
+                }
+            } catch (e) {
+                console.error('localStorage load failed:', e);
+            }
+            return null;
+        }
+
+        // Load from IndexedDB
+        async function loadFromIndexedDB() {
+            if (!db) return null;
+
+            return new Promise((resolve) => {
+                try {
+                    const transaction = db.transaction([STORE_NAME], 'readonly');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.get('main');
+
+                    request.onsuccess = () => resolve(request.result || null);
+                    request.onerror = () => resolve(null);
+                } catch (e) {
+                    console.error('IndexedDB load error:', e);
+                    resolve(null);
+                }
+            });
         }
 
         async function loadFromStorage() {
-            if (!db) return false;
+            // Load from both sources
+            const lsData = loadFromLocalStorage();
+            const idbData = await loadFromIndexedDB();
 
-            return new Promise((resolve) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get('main');
+            // Use the most recent one
+            let data = null;
+            if (lsData && idbData) {
+                const lsTime = new Date(lsData.lastSaved || 0).getTime();
+                const idbTime = new Date(idbData.lastSaved || 0).getTime();
+                data = lsTime > idbTime ? lsData : idbData;
+                console.log(`Loaded from ${lsTime > idbTime ? 'localStorage' : 'IndexedDB'} (more recent)`);
+            } else {
+                data = lsData || idbData;
+                console.log(`Loaded from ${lsData ? 'localStorage' : 'IndexedDB'} (only source)`);
+            }
 
-                request.onsuccess = () => {
-                    const data = request.result;
-                    if (data) {
-                        translations = data.translations || {};
-                        languages = data.languages || [];
-                        translationKeys = data.translationKeys || [];
-                        if (data.theme) {
-                            document.documentElement.setAttribute('data-theme', data.theme);
-                            if (data.theme === 'dark') {
-                                document.getElementById('themeToggle').classList.add('active');
-                            }
-                        }
-                        resolve(true);
-                    } else {
-                        resolve(false);
+            if (data) {
+                translations = data.translations || {};
+                languages = data.languages || [];
+                translationKeys = data.translationKeys || [];
+                lastSavedTimestamp = data.lastSaved;
+
+                if (data.theme) {
+                    document.documentElement.setAttribute('data-theme', data.theme);
+                    if (data.theme === 'dark') {
+                        document.getElementById('themeToggle')?.classList.add('active');
                     }
-                };
-
-                request.onerror = () => resolve(false);
-            });
+                }
+                return true;
+            }
+            return false;
         }
 
         function debouncedSave() {
             clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => saveToStorage(), 500);
+            saveTimeout = setTimeout(() => saveToStorage(), 300);
         }
+
+        // Immediate save for critical operations
+        function immediateSave() {
+            clearTimeout(saveTimeout);
+            saveToStorage(true);
+        }
+
+        // Save before page unload
+        window.addEventListener('beforeunload', (e) => {
+            // Synchronously save to localStorage before page closes
+            const data = getStorageData();
+            saveToLocalStorage(data);
+        });
+
+        // Periodic auto-save every 30 seconds
+        setInterval(() => {
+            if (languages.length > 0 || translationKeys.length > 0) {
+                saveToStorage();
+            }
+        }, 30000);
 
         // ========================
         // UI Rendering
@@ -1583,7 +1754,7 @@
 
             input.value = '';
             renderAll();
-            debouncedSave();
+            immediateSave(); // Critical operation - save immediately
             showToast(`Added language: ${code.toUpperCase()}`, 'success');
         }
 
@@ -1599,7 +1770,7 @@
             delete translations[lang];
 
             renderAll();
-            debouncedSave();
+            immediateSave(); // Critical operation - save immediately
             showToast(`Removed language: ${lang.toUpperCase()}`, 'success');
         }
 
@@ -1613,17 +1784,56 @@
                     try {
                         const content = await file.text();
                         const data = JSON.parse(content);
-                        translations[lang] = data;
+
+                        // Check if language already has translations
+                        const existingCount = countTranslated(lang);
+                        if (existingCount > 0) {
+                            const choice = confirm(
+                                `${lang.toUpperCase()} already has ${existingCount} translations.\n\n` +
+                                `Click OK to MERGE (keep existing, add new)\n` +
+                                `Click Cancel to REPLACE (overwrite all)`
+                            );
+                            if (choice) {
+                                // Merge: keep existing, add new
+                                mergeTranslations(lang, data);
+                            } else {
+                                // Replace
+                                translations[lang] = data;
+                            }
+                        } else {
+                            translations[lang] = data;
+                        }
+
                         extractKeys(data);
                         renderAll();
-                        debouncedSave();
+                        immediateSave(); // Use immediate save for file operations
                         showToast(`Loaded translations for ${lang.toUpperCase()}`, 'success');
                     } catch (err) {
-                        showToast('Error parsing JSON file', 'error');
+                        showToast('Error parsing JSON file: ' + err.message, 'error');
                     }
                 }
             };
             input.click();
+        }
+
+        // Merge new translations into existing (preserves existing values)
+        function mergeTranslations(lang, newData, prefix = '') {
+            if (!translations[lang]) {
+                translations[lang] = {};
+            }
+
+            for (const key in newData) {
+                const fullKey = prefix ? `${prefix}.${key}` : key;
+                if (typeof newData[key] === 'object' && newData[key] !== null) {
+                    mergeTranslations(lang, newData[key], fullKey);
+                } else {
+                    // Only set if not already exists or is empty
+                    const existingValue = getNestedValue(translations[lang], fullKey);
+                    if (!existingValue || existingValue.trim() === '') {
+                        setNestedValue(translations[lang], fullKey, newData[key]);
+                    }
+                }
+            }
         }
 
         // ========================
@@ -1666,6 +1876,7 @@
 
         async function processFiles(files) {
             let loaded = 0;
+            let merged = 0;
 
             for (const file of files) {
                 if (!file.name.endsWith('.json')) continue;
@@ -1679,11 +1890,21 @@
                     // Handle common patterns like "en-US.json" -> "en-us"
                     lang = lang.split('/').pop();
 
-                    if (!languages.includes(lang)) {
+                    const isNew = !languages.includes(lang);
+                    if (isNew) {
                         languages.push(lang);
                     }
 
-                    translations[lang] = data;
+                    // Check if language already has translations
+                    const existingCount = countTranslated(lang);
+                    if (existingCount > 0 && !isNew) {
+                        // Auto-merge for drag & drop (safer default)
+                        mergeTranslations(lang, data);
+                        merged++;
+                    } else {
+                        translations[lang] = data;
+                    }
+
                     extractKeys(data);
                     loaded++;
                 } catch (err) {
@@ -1693,8 +1914,12 @@
 
             if (loaded > 0) {
                 renderAll();
-                debouncedSave();
-                showToast(`Loaded ${loaded} file(s)`, 'success');
+                immediateSave(); // Use immediate save for file operations
+                let message = `Loaded ${loaded} file(s)`;
+                if (merged > 0) {
+                    message += ` (${merged} merged with existing)`;
+                }
+                showToast(message, 'success');
             }
         }
 
@@ -1785,7 +2010,7 @@
 
             closeAddKeyModal();
             renderAll();
-            debouncedSave();
+            immediateSave(); // Critical operation - save immediately
             showToast(`Added key: ${key}`, 'success');
         }
 
@@ -1849,20 +2074,115 @@
         // Data Management
         // ========================
         async function clearAllData() {
-            if (!confirm('Are you sure you want to clear all data? This cannot be undone.')) return;
+            if (!confirm('Are you sure you want to clear all data? This cannot be undone.\n\nTip: Export your data first using "Export Full Backup" button.')) return;
+
+            // Double confirmation for safety
+            if (!confirm('This will delete ALL translations for ALL languages. Are you REALLY sure?')) return;
 
             translations = {};
             languages = [];
             translationKeys = [];
 
+            // Clear IndexedDB
             if (db) {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                store.delete('main');
+                try {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    store.delete('main');
+                } catch (e) {
+                    console.error('Failed to clear IndexedDB:', e);
+                }
+            }
+
+            // Clear localStorage
+            try {
+                localStorage.removeItem(LS_KEY);
+                localStorage.removeItem(LS_TIMESTAMP_KEY);
+            } catch (e) {
+                console.error('Failed to clear localStorage:', e);
             }
 
             renderAll();
             showToast('All data cleared', 'success');
+        }
+
+        // Export full backup (all data including metadata)
+        function exportFullBackup() {
+            const backup = {
+                exportedAt: new Date().toISOString(),
+                version: 2,
+                translations,
+                languages,
+                translationKeys,
+                theme: document.documentElement.getAttribute('data-theme')
+            };
+
+            const content = JSON.stringify(backup, null, 2);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            downloadFile(`translation-backup-${timestamp}.json`, content, 'application/json');
+            showToast('Full backup exported', 'success');
+        }
+
+        // Import full backup
+        function importFullBackup() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    try {
+                        const content = await file.text();
+                        const backup = JSON.parse(content);
+
+                        // Validate backup structure
+                        if (!backup.translations || !backup.languages) {
+                            throw new Error('Invalid backup file format');
+                        }
+
+                        const choice = confirm(
+                            `This backup contains ${backup.languages.length} language(s) and ${(backup.translationKeys || []).length} keys.\n\n` +
+                            `Exported: ${backup.exportedAt || 'Unknown'}\n\n` +
+                            `Click OK to REPLACE all current data\n` +
+                            `Click Cancel to MERGE with existing data`
+                        );
+
+                        if (choice) {
+                            // Replace all
+                            translations = backup.translations;
+                            languages = backup.languages;
+                            translationKeys = backup.translationKeys || [];
+                        } else {
+                            // Merge
+                            backup.languages.forEach(lang => {
+                                if (!languages.includes(lang)) {
+                                    languages.push(lang);
+                                }
+                                if (backup.translations[lang]) {
+                                    if (translations[lang]) {
+                                        mergeTranslations(lang, backup.translations[lang]);
+                                    } else {
+                                        translations[lang] = backup.translations[lang];
+                                    }
+                                }
+                            });
+                            // Merge keys
+                            (backup.translationKeys || []).forEach(key => {
+                                if (!translationKeys.includes(key)) {
+                                    translationKeys.push(key);
+                                }
+                            });
+                        }
+
+                        renderAll();
+                        immediateSave();
+                        showToast('Backup imported successfully', 'success');
+                    } catch (err) {
+                        showToast('Error importing backup: ' + err.message, 'error');
+                    }
+                }
+            };
+            input.click();
         }
 
         // ========================
